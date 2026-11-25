@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Webhook Catcher</title>
+<style>
+  :root{
+    --bg:#0e1014;--panel:#151920;--panel2:#1b2029;--hover:#212734;--border:#2a313d;
+    --text:#e6e8eb;--muted:#8b94a5;--accent:#4f9cf9;--green:#3fb950;--yellow:#d29922;
+    --red:#f85149;--purple:#bc8cff;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--border);
+    border-radius:6px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+  button:hover{background:var(--hover)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover{filter:brightness(1.1)}
+  button.danger:hover{border-color:var(--red);color:var(--red)}
+  input{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);
+    border-radius:6px;padding:6px 8px;width:100%}
+  input:focus{outline:none;border-color:var(--accent)}
+
+  .app{display:grid;grid-template-columns:250px 1fr;height:100vh}
+  aside{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+  .brand{padding:14px 16px;font-weight:700;letter-spacing:.2px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  .newsess{padding:12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+  .sesslist{overflow:auto;flex:1}
+  .sess{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+  .sess:hover{background:var(--hover)}
+  .sess.active{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+  .sess .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sess .m{color:var(--muted);font-size:12px}
+
+  main{display:grid;grid-template-rows:auto 1fr;min-height:0;min-width:0}
+  .top{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .urlbox{flex:1;min-width:280px;display:flex;gap:6px;align-items:center}
+  .urlbox code{flex:1;font-family:var(--mono);font-size:13px;background:var(--bg);border:1px solid var(--border);
+    border-radius:6px;padding:7px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;user-select:all}
+  .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+  .tools{display:flex;gap:6px;flex-wrap:wrap}
+
+  .content{display:grid;grid-template-columns:minmax(300px,380px) 1fr;min-height:0}
+  .reqlist{border-right:1px solid var(--border);overflow:auto;min-height:0}
+  .req{padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:grid;grid-template-columns:64px 1fr;gap:2px 10px}
+  .req:hover{background:var(--hover)}
+  .req.active{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+  .req.fresh{animation:flash 1.2s ease-out}
+  @keyframes flash{from{background:rgba(79,156,249,.25)}to{background:transparent}}
+  .meth{font-family:var(--mono);font-weight:700;font-size:12px}
+  .GET{color:var(--green)}.POST{color:var(--accent)}.PUT,.PATCH{color:var(--yellow)}.DELETE{color:var(--red)}
+  .meth.other{color:var(--purple)}
+  .req .p{font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .req .s{grid-column:2;color:var(--muted);font-size:12px}
+  .req .num{color:var(--muted);font-size:12px}
+
+  .detail{overflow:auto;min-height:0;padding:16px 20px}
+  .empty{color:var(--muted);padding:40px 20px;text-align:center}
+  .empty code{font-family:var(--mono);color:var(--text);background:var(--panel2);padding:2px 6px;border-radius:4px}
+  .dhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .dhead h2{margin:0;font-size:16px;font-family:var(--mono);font-weight:600;word-break:break-all}
+  .meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:16px}
+  .meta div{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+  .meta b{display:block;color:var(--muted);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+  .meta span{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+  section{margin-bottom:18px}
+  section h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:0 0 6px;display:flex;align-items:center;gap:8px}
+  section h3 button{padding:2px 8px;font-size:11px;text-transform:none;letter-spacing:0}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;background:var(--panel);
+    border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  td{padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:top;word-break:break-all}
+  td:first-child{color:var(--muted);width:32%;white-space:nowrap;word-break:normal}
+  tr:last-child td{border-bottom:0}
+  pre{margin:0;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px;
+    font-family:var(--mono);font-size:12.5px;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto}
+  .tag{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:var(--panel2);border:1px solid var(--border);padding:8px 14px;border-radius:8px;transition:.2s;pointer-events:none}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+    aside{max-height:35vh}
+    .content{grid-template-columns:1fr;grid-template-rows:40vh 1fr}
+    .reqlist{border-right:0;border-bottom:1px solid var(--border)}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><span class="dot"></span>Webhook Catcher</div>
+    <div class="newsess">
+      <input id="newName" placeholder="Session name (optional)" maxlength="80">
+      <button class="primary" id="newBtn">+ New session</button>
+    </div>
+    <div class="sesslist" id="sessList"></div>
+  </aside>
+  <main>
+    <div class="top">
+      <div class="urlbox">
+        <span class="label">URL</span>
+        <code id="hookUrl">—</code>
+        <button id="copyUrl">Copy</button>
+      </div>
+      <div class="tools">
+        <button id="copySessMd" title="Copy every request in this session as Markdown">Copy all for chat</button>
+        <button id="dlSessMd">Download all .md</button>
+        <button id="dlSessJson">Download all .json</button>
+        <button id="renameBtn">Rename</button>
+        <button class="danger" id="clearBtn">Clear</button>
+        <button class="danger" id="deleteBtn">Delete</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="reqlist" id="reqList"></div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script>
+const state = { sessions: [], active: null, requests: [], version: null, lastSeq: 0, selected: null, loaded: false };
+const $ = (s) => document.querySelector(s);
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v != null && v !== false) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) {
+    if (k == null || k === false) continue;
+    e.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  }
+  return e;
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { 'content-type': 'application/json' }, ...opts });
+  if (!r.ok) { const err = new Error(r.status + ' ' + (await r.text())); err.status = r.status; throw err; }
+  const ct = r.headers.get('content-type') || '';
+  return ct.includes('json') ? r.json() : r.text();
+}
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+async function copyText(text, msg = 'Copied') {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = el('textarea'); ta.value = text; document.body.append(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  toast(msg);
+}
+
+function ago(iso) {
+  if (!iso) return '';
+  const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+  if (s < 5) return 'just now';
+  if (s < 60) return Math.floor(s) + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return new Date(iso).toLocaleDateString();
+}
+const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const bytes = (n) => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB';
+const methClass = (m) => ['GET','POST','PUT','PATCH','DELETE'].includes(m) ? m : 'other';
+const hookUrl = (id) => location.origin + '/hook/' + id;
+const activeSession = () => state.sessions.find((s) => s.id === state.active);
+
+// ---------- sessions ----------
+
+async function loadSessions() {
+  state.sessions = await api('/api/sessions');
+  if (!state.sessions.length) {
+    const s = await api('/api/sessions', { method: 'POST', body: JSON.stringify({ name: 'Session 1' }) });
+    state.sessions = [s];
+  }
+  if (!activeSession()) {
+    const fromHash = location.hash.slice(1);
+    const pick = state.sessions.find((s) => s.id === fromHash) || state.sessions[0];
+    await selectSession(pick.id);
+  }
+  renderSessions();
+}
+
+function renderSessions() {
+  const list = $('#sessList'); list.replaceChildren();
+  for (const s of state.sessions) {
+    list.append(el('div', { class: 'sess' + (s.id === state.active ? ' active' : ''), onclick: () => selectSession(s.id) },
+      el('div', { class: 'n' }, s.name || s.id),
+      el('div', { class: 'm' }, `${s.count} request${s.count === 1 ? '' : 's'} · ${s.lastAt ? 'last ' + ago(s.lastAt) : 'created ' + ago(s.createdAt)}`)));
+  }
+  const s = activeSession();
+  $('#hookUrl').textContent = s ? hookUrl(s.id) : '—';
+}
+
+async function selectSession(id) {
+  Object.assign(state, { active: id, requests: [], version: null, lastSeq: 0, selected: null, loaded: false });
+  try { history.replaceState(null, '', '#' + id); } catch {}
+  renderSessions(); renderList(); renderDetail(null);
+  await pollRequests();
+}
+
+$('#newBtn').onclick = async () => {
+  const name = $('#newName').value.trim() || `Session ${state.sessions.length + 1}`;
+  const s = await api('/api/sessions', { method: 'POST', body: JSON.stringify({ name }) });
+  $('#newName').value = '';
+  state.sessions.unshift(s);
+  await selectSession(s.id);
+  toast('New session started');
+};
+$('#newName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#newBtn').click(); });
+
+$('#copyUrl').onclick = () => state.active && copyText(hookUrl(state.active), 'Webhook URL copied');
+$('#dlSessMd').onclick = () => state.active && (location.href = `/api/sessions/${state.active}/export?format=md`);
+$('#dlSessJson').onclick = () => state.active && (location.href = `/api/sessions/${state.active}/export?format=json`);
+$('#copySessMd').onclick = async () => {
+  if (!state.active) return;
+  const md = await api(`/api/sessions/${state.active}/export?format=md&inline=1`);
+  copyText(md, 'Session copied as Markdown');
+};
+$('#renameBtn').onclick = async () => {
+  const s = activeSession(); if (!s) return;
+  const name = prompt('Rename session', s.name || '');
+  if (name == null) return;
+  Object.assign(s, await api(`/api/sessions/${s.id}`, { method: 'PATCH', body: JSON.stringify({ name }) }));
+  renderSessions();
+};
+$('#clearBtn').onclick = async () => {
+  const s = activeSession(); if (!s || !confirm(`Clear all requests in "${s.name || s.id}"?`)) return;
+  await api(`/api/sessions/${s.id}/clear`, { method: 'POST' });
+  await selectSession(s.id);
+};
+$('#deleteBtn').onclick = async () => {
+  const s = activeSession(); if (!s || !confirm(`Delete session "${s.name || s.id}"? Its URL will stop being tracked here.`)) return;
+  await api(`/api/sessions/${s.id}`, { method: 'DELETE' });
+  state.active = null;
+  await loadSessions();
+};
+
+// ---------- requests ----------
+
+async function pollRequests() {
+  const sid = state.active; if (!sid) return;
+  let data;
+  try { data = await api(`/api/sessions/${sid}/requests?after=${state.lastSeq}`); }
+  catch (e) { if (e.status === 404) { state.active = null; await loadSessions(); } return; }
+  if (sid !== state.active) return;
+  if (state.version !== null && data.version !== state.version) {
+    Object.assign(state, { requests: [], lastSeq: 0, version: null, selected: null });
+    renderDetail(null);
+    return pollRequests();
+  }
+  state.version = data.version;
+  const firstLoad = !state.loaded; state.loaded = true;
+  if (data.requests.length) {
+    const fresh = new Set(firstLoad ? [] : data.requests.map((r) => r.id));
+    state.requests = [...data.requests].reverse().concat(state.requests);
+    state.lastSeq = Math.max(state.lastSeq, ...data.requests.map((r) => r.seq));
+    renderList(fresh);
+  } else if (firstLoad) renderList();
+}
+
+function renderList(fresh = new Set()) {
+  const list = $('#reqList'); list.replaceChildren();
+  if (!state.requests.length) {
+    list.append(el('div', { class: 'empty' }, 'Waiting for requests…'));
+    if (!state.selected) renderDetail(null);
+    return;
+  }
+  for (const r of state.requests) {
+    const sub = r.path.replace(/^\/hook\/[^/]+/, '') || '/';
+    list.append(el('div', {
+      class: 'req' + (r.id === state.selected ? ' active' : '') + (fresh.has(r.id) ? ' fresh' : ''),
+      onclick: () => selectRequest(r.id),
+    },
+      el('span', { class: 'meth ' + methClass(r.method) }, r.method),
+      el('span', { class: 'p' }, sub + (r.contentType ? '' : '')),
+      el('span', { class: 'num' }, '#' + r.seq),
+      el('span', { class: 's' }, `${clock(r.receivedAt)} · ${bytes(r.size)}${r.contentType ? ' · ' + r.contentType.split(';')[0] : ''}`)));
+  }
+  if (!state.selected) renderDetail(null);
+}
+
+async function selectRequest(id) {
+  state.selected = id; renderList();
+  try { renderDetail(await api(`/api/sessions/${state.active}/requests/${id}`)); }
+  catch { renderDetail(null); }
+}
+
+function kvTable(obj) {
+  return el('table', {}, el('tbody', {}, Object.entries(obj).map(([k, v]) =>
+    el('tr', {}, el('td', {}, k), el('td', {}, Array.isArray(v) ? v.join(', ') : String(v))))));
+}
+
+function renderDetail(r) {
+  const d = $('#detail'); d.replaceChildren();
+  if (!r) {
+    const s = activeSession();
+    d.append(el('div', { class: 'empty' },
+      state.requests.length ? 'Click a request to see the full details.' : el('div', {},
+        el('p', {}, 'Send anything to this session\'s URL:'),
+        s ? el('p', {}, el('code', {}, hookUrl(s.id))) : null,
+        s ? el('p', {}, el('code', {}, `curl -X POST ${hookUrl(s.id)} -H "content-type: application/json" -d '{"hello":"world"}'`)) : null,
+        el('p', {}, 'Any method, any sub-path, any body.'))));
+    return;
+  }
+  const base = `/api/sessions/${state.active}/requests/${r.id}/export`;
+  d.append(el('div', { class: 'dhead' },
+    el('span', { class: 'meth ' + methClass(r.method) }, r.method),
+    el('h2', {}, r.url),
+    el('span', { class: 'tag' }, '#' + r.seq)));
+  d.append(el('div', { class: 'tools', style: 'margin-bottom:14px' },
+    el('button', { class: 'primary', onclick: async () => copyText(await api(base + '?format=md&inline=1'), 'Copied as Markdown — paste into chat') }, 'Copy for chat'),
+    el('button', { onclick: () => (location.href = base + '?format=md') }, 'Download .md'),
+    el('button', { onclick: () => (location.href = base + '?format=json') }, 'Download .json'),
+    el('button', { onclick: () => copyText(JSON.stringify(r, null, 2), 'Raw JSON copied') }, 'Copy raw JSON'),
+    el('button', { class: 'danger', onclick: async () => {
+      await api(`/api/sessions/${state.active}/requests/${r.id}`, { method: 'DELETE' });
+      state.requests = state.requests.filter((x) => x.id !== r.id); state.selected = null; renderList(); renderDetail(null);
+    } }, 'Delete')));
+  d.append(el('div', { class: 'meta' },
+    ...[['Received', new Date(r.receivedAt).toLocaleString()], ['From IP', r.ip || '—'],
+        ['Content-Type', r.contentType || '(none)'], ['Size', bytes(r.size) + (r.truncated ? ' (truncated)' : '')]]
+      .map(([k, v]) => el('div', {}, el('b', {}, k), el('span', {}, v)))));
+
+  if (Object.keys(r.query).length) d.append(el('section', {}, el('h3', {}, 'Query parameters'), kvTable(r.query)));
+
+  let bodyText, bodyLabel = 'Body';
+  if (r.bodyEncoding === 'none') bodyText = '(empty)';
+  else if (r.json !== undefined) { bodyText = JSON.stringify(r.json, null, 2); bodyLabel = 'Body · JSON'; }
+  else if (r.bodyEncoding === 'base64') { bodyText = r.body; bodyLabel = 'Body · binary (base64)'; }
+  else bodyText = r.body;
+  if (r.form) d.append(el('section', {}, el('h3', {}, 'Form fields'), kvTable(r.form)));
+  d.append(el('section', {},
+    el('h3', {}, bodyLabel, r.bodyEncoding !== 'none' ? el('button', { onclick: () => copyText(bodyText, 'Body copied') }, 'Copy') : null),
+    el('pre', {}, bodyText)));
+  d.append(el('section', {},
+    el('h3', {}, 'Headers', el('button', { onclick: () => copyText(JSON.stringify(r.headers, null, 2), 'Headers copied') }, 'Copy')),
+    kvTable(r.headers)));
+}
+
+// ---------- loop ----------
+
+(async function init() {
+  await loadSessions();
+  setInterval(() => { if (!document.hidden) pollRequests(); }, 2000);
+  setInterval(async () => {
+    if (document.hidden) return;
+    try { state.sessions = await api('/api/sessions'); renderSessions(); } catch {}
+  }, 5000);
+})();
+</script>
+</body>
+</html>
