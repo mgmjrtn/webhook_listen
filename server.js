@@ -21,7 +21,17 @@ const MAX_PER_SESSION = Number(process.env.MAX_REQUESTS_PER_SESSION) || 1000;
 const MAX_SESSIONS = Number(process.env.MAX_SESSIONS) || 50;
 const RESPONSE_STATUS = Number(process.env.RESPONSE_STATUS) || 200;
 
-const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
+// Look for the UI in public/ first, then next to server.js (handles flattened uploads).
+const INDEX_PATH = [
+  path.join(__dirname, 'public', 'index.html'),
+  path.join(__dirname, 'index.html'),
+].find((p) => fs.existsSync(p));
+if (!INDEX_PATH) {
+  console.error('index.html not found. Expected public/index.html (or index.html) next to server.js. Files here: ' +
+    fs.readdirSync(__dirname).join(', '));
+  process.exit(1);
+}
+const INDEX_HTML = fs.readFileSync(INDEX_PATH);
 const SID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** @type {Map<string, any>} insertion order == creation order */
